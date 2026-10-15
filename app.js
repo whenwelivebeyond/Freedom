@@ -440,11 +440,9 @@ function detailsHTML(c){
     +     '<button class="chip" data-preset="notConnected" aria-pressed="'+(state.preset==="notConnected")+'">Not connected</button>'
     +   '</div></div>'
     + '<textarea id="p-msg" placeholder="Write what you want to send"></textarea>'
-    + '<div class="inserts">'
-    +   '<button class="chip" data-ins="name">Insert name</button>'
-    +   '<button class="chip" data-ins="homestay">Insert homestay</button>'
-    +   (c.claudeLink ? '<button class="chip" data-ins="link">Insert link</button>' : '')
-    +   '<button class="chip" data-ins="reset">Reset message</button>'
+    + '<div class="message-actions">'
+    +   '<button class="chip" id="clearMessage" type="button">Clear</button>'
+    +   '<button class="chip" id="resetMessage" type="button">Reset message</button>'
     + '</div></div>'
     + '<div class="send-row">'
     +   '<button class="btn primary" id="sendWa">'+ICON.wa+'Send on WhatsApp</button>'
@@ -489,14 +487,17 @@ function wireDetails(c){
       } else fallbackCopy(v);
     });
   }
-  Array.prototype.forEach.call(w.querySelectorAll("[data-ins]"), function(b){
-    b.addEventListener("click", function(){
-      var k = b.dataset.ins;
-      if (k === "reset"){ msg.value = template(c); state.msgTouched = false; state.draft = null; msg.focus(); return; }
-      var t = k === "name" ? c.name : (k === "homestay" ? c.homestay : c.claudeLink);
-      insertAtCursor(msg, t);
-      state.msgTouched = true; state.draft = msg.value;
-    });
+  el("clearMessage").addEventListener("click", function(){
+    msg.value = "";
+    state.msgTouched = true;
+    state.draft = "";
+    msg.focus();
+  });
+  el("resetMessage").addEventListener("click", function(){
+    msg.value = template(c);
+    state.msgTouched = false;
+    state.draft = null;
+    msg.focus();
   });
   el("sendWa").addEventListener("click", function(){
     var d = waDigits(c.number);
@@ -537,12 +538,6 @@ var TEMPLATES = {
 function template(c){
   var make = TEMPLATES[state.preset] || TEMPLATES.connected;
   return make(c);
-}
-
-function insertAtCursor(ta, text){
-  var s = ta.selectionStart, e = ta.selectionEnd;
-  ta.value = ta.value.slice(0,s) + text + ta.value.slice(e);
-  ta.focus(); ta.selectionStart = ta.selectionEnd = s + text.length;
 }
 
 function fallbackCopy(v){
