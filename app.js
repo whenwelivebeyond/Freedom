@@ -19,18 +19,20 @@ var auth = getAuth(firebaseApp);
 var db = getFirestore(firebaseApp);
 var googleProvider = new GoogleAuthProvider();
 
-var STATUSES = ["Open","Ready to pitch","Converted","Done"];
-var SCLASS = {"Open":"s-open","Ready to pitch":"s-ready","Converted":"s-conv","Done":"s-done"};
+var STATUSES = ["Open","Ready to pitch","Pitched","Converted","Done"];
+var SCLASS = {"Open":"s-open","Ready to pitch":"s-ready","Pitched":"s-pitch","Converted":"s-conv","Done":"s-done"};
+function sclass(st){ return SCLASS[st] || "s-open"; }
 
 var ICON = {
   copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>',
   open:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
   globe:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.3 2.4 3.4 5.4 3.4 8.5S14.3 18.1 12 20.5c-2.3-2.4-3.4-5.4-3.4-8.5S9.7 5.9 12 3.5z"/></svg>',
   spark:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.1 5.3 5.4 2-5.4 2-2.1 5.4-2.1-5.4-5.4-2 5.4-2z"/></svg>',
+  phone:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.6 3.5h3l1.5 3.8-2 1.2a12 12 0 0 0 5.4 5.4l1.2-2 3.8 1.5v3a1.6 1.6 0 0 1-1.7 1.6A15.6 15.6 0 0 1 5 6.2 1.6 1.6 0 0 1 6.6 3.5z"/></svg>',
   wa:'<svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 2.2A9.7 9.7 0 0 0 3.6 16.8L2.2 21.8l5.2-1.4A9.7 9.7 0 1 0 12 2.2zm0 1.8a7.9 7.9 0 1 1-4 14.7l-.4-.2-3 .8.8-2.9-.2-.4A7.9 7.9 0 0 1 12 4zm-3.1 3.6c-.2 0-.5 0-.7.1-.3.1-1.1.6-1.1 1.9s.9 2.6 1 2.8c.1.2 1.8 3 4.5 4 .6.3 1.1.4 1.5.5.6.2 1.2.2 1.6.1.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2-.1-.1-.3-.2-.6-.3l-1.5-.8c-.2-.1-.4-.1-.6.1l-.6.8c-.1.2-.3.2-.5.1-.3-.1-1.1-.4-2.1-1.3-.8-.7-1.3-1.5-1.4-1.8-.1-.2 0-.4.1-.5l.4-.5c.1-.2.2-.3.2-.5s0-.3-.1-.4l-.7-1.6c-.2-.4-.4-.4-.6-.4h-.1z"/></svg>'
 };
 
-var state = { page:"add", clients:[], filter:"All", search:"", editingId:null, pitchId:null, msgTouched:false, draft:null, confirmId:null, fresh:true };
+var state = { page:"add", clients:[], filter:"All", search:"", editingId:null, pitchId:null, msgTouched:false, draft:null, preset:"connected", confirmId:null, fresh:true };
 /* =========================================================================
    DATA LAYER — Firestore stores the client records in the cloud.
 
@@ -153,16 +155,17 @@ el("saveBtn").addEventListener("click", async function(){
   markBad("f-name", !name); markBad("f-stay", !stay); markBad("f-num", !num);
   if (!name || !stay || !num) return;
   var btn = this; btn.disabled = true;
+  var builtLink = tidyUrl(el("i-claude").value);
   try{
     await createClient({
       name:name, homestay:stay, number:num,
       website: tidyUrl(el("i-site").value),
-      claudeLink: tidyUrl(el("i-claude").value),
-      status:"Open"
+      claudeLink: builtLink,
+      status: builtLink ? "Ready to pitch" : "Open"
     });
     ["i-name","i-stay","i-num","i-site","i-claude"].forEach(function(i){ el(i).value=""; });
     el("i-name").focus();
-    toast(stay + " saved");
+    toast(builtLink ? stay + " saved \u2014 ready to pitch" : stay + " saved");
   }catch(e){ toast("Couldn\u2019t save \u2014 " + (e && e.code ? e.code : "try again")); }
   btn.disabled = false;
 });
@@ -182,11 +185,13 @@ function renderChips(){
   STATUSES.forEach(function(s){ counts[s] = 0; });
   state.clients.forEach(function(c){ if (counts[c.status] != null) counts[c.status]++; });
   var all = ["All"].concat(STATUSES);
-  el("filterChips").innerHTML = all.map(function(s){
-    return '<button class="chip" data-f="'+esc(s)+'" aria-pressed="'+(state.filter===s)+'">'+esc(s)+'<b>'+counts[s]+'</b></button>';
-  }).join("");
-  Array.prototype.forEach.call(el("filterChips").querySelectorAll(".chip"), function(b){
-    b.addEventListener("click", function(){ state.filter = b.dataset.f; renderChips(); renderList(); });
+  el("filterWrap").innerHTML = '<select id="statusFilter" aria-label="Filter by status">'
+    + all.map(function(s){
+        return '<option value="'+esc(s)+'"'+(state.filter===s?" selected":"")+'>'+esc(s)+' ('+counts[s]+')</option>';
+      }).join("")
+    + '</select>';
+  el("statusFilter").addEventListener("change", function(){
+    state.filter = this.value; renderList();
   });
 }
 
@@ -212,21 +217,19 @@ function renderList(){
   }
   var body = rows.map(function(c, i){
     var opts = STATUSES.map(function(s){ return '<option value="'+esc(s)+'"'+(c.status===s?" selected":"")+'>'+esc(s)+'</option>'; }).join("");
-    var site = c.website ? '<a href="'+esc(c.website)+'" target="_blank" rel="noopener" title="Their website">'+ICON.globe+'</a>'
-                         : '<a aria-disabled="true" title="No website">'+ICON.globe+'</a>';
-    var mine = c.claudeLink ? '<a href="'+esc(c.claudeLink)+'" target="_blank" rel="noopener" title="Site you built">'+ICON.spark+'</a>'
-                            : '<a aria-disabled="true" title="No link yet">'+ICON.spark+'</a>';
+    var site = c.website ? '<a href="'+esc(c.website)+'" target="_blank" rel="noopener" title="Their website">'+ICON.globe+'</a>' : '';
+    var mine = c.claudeLink ? '<a href="'+esc(c.claudeLink)+'" target="_blank" rel="noopener" title="Site you built">'+ICON.spark+'</a>' : '';
     var del = state.confirmId === c.id
       ? '<button class="btn danger" data-del="'+c.id+'">Confirm delete</button>'
       : '<button class="btn danger" data-ask="'+c.id+'">Delete</button>';
     var anim = fresh && i < 12 ? ' class="in" style="animation-delay:'+(i*0.035).toFixed(3)+'s"' : '';
     return '<tr'+anim+'>'
-      + '<td data-label="Client"><span class="c-name">'+esc(c.name)+'</span></td>'
-      + '<td data-label="Homestay">'+esc(c.homestay)+'</td>'
-      + '<td data-label="Number" class="num">'+esc(prettyNum(c.number))+'</td>'
-      + '<td data-label="Links" class="links">'+site+mine+'</td>'
-      + '<td data-label="Status"><select class="status-sel '+SCLASS[c.status]+'" data-st="'+c.id+'" aria-label="Status for '+esc(c.homestay)+'">'+opts+'</select></td>'
-      + '<td class="act"><button class="linkish" data-edit="'+c.id+'">Edit</button>'+del+'</td>'
+      + '<td class="t-client" data-label="Client"><span class="c-name">'+esc(c.name)+'</span></td>'
+      + '<td class="t-stay" data-label="Homestay">'+esc(c.homestay)+'</td>'
+      + '<td class="t-num num" data-label="Number">'+esc(prettyNum(c.number))+'</td>'
+      + '<td class="t-links links" data-label="Links">'+site+mine+'</td>'
+      + '<td class="t-status" data-label="Status"><select class="status-sel '+sclass(c.status)+'" data-st="'+c.id+'" aria-label="Status for '+esc(c.homestay)+'">'+opts+'</select></td>'
+      + '<td class="t-act act"><button class="linkish" data-edit="'+c.id+'">Edit</button>'+del+'</td>'
       + '</tr>';
   }).join("");
 
@@ -236,7 +239,7 @@ function renderList(){
 
   Array.prototype.forEach.call(w.querySelectorAll("[data-st]"), function(s){
     s.addEventListener("change", async function(){
-      s.className = "status-sel " + SCLASS[s.value] + " flash";
+      s.className = "status-sel " + sclass(s.value) + " flash";
       try{ await patchClient(s.dataset.st, {status:s.value}); toast("Moved to \u201c"+s.value+"\u201d"); }
       catch(e){ toast("Couldn\u2019t update"); renderList(); }
     });
@@ -410,8 +413,18 @@ function closeAllCombos(){
 }
 
 function detailsHTML(c){
+  var dialDigits = waDigits(c.number);
+  var stOpts = STATUSES.map(function(st){
+    return '<option value="'+esc(st)+'"'+(c.status===st?" selected":"")+'>'+esc(st)+'</option>';
+  }).join("");
   return '<div class="card step">'
-    + '<div class="pitch-head"><b>'+esc(c.homestay)+'</b><span class="c-sub">'+esc(c.name)+' \u00b7 '+esc(prettyNum(c.number))+'</span></div>'
+    + '<div class="pitch-head"><b>'+esc(c.homestay)+'</b><span class="c-sub">'+esc(c.name)+' \u00b7 '+esc(prettyNum(c.number))+'</span>'
+    +   '<select class="status-sel '+sclass(c.status)+'" id="p-status" aria-label="Status for '+esc(c.homestay)+'">'+stOpts+'</select>'
+    + '</div>'
+    + (dialDigits.length >= 10
+        ? '<div class="call-row"><a class="btn ghost" href="tel:+'+dialDigits+'">'+ICON.phone+'Call '+esc(prettyNum(c.number))+'</a>'
+          + '<span class="note">Opens your phone with the number ready \u2014 you still press call.</span></div>'
+        : '<p class="c-sub call-row" style="margin:0">That number looks incomplete, so there\u2019s nothing to dial. Fix it under Clients \u2192 Edit.</p>')
     + '<h2 style="margin-top:18px">The link you\u2019ll send</h2>'
     + (c.claudeLink
         ? '<div class="link-row"><input type="text" id="p-link" readonly value="'+esc(c.claudeLink)+'" aria-label="Site link">'
@@ -420,13 +433,18 @@ function detailsHTML(c){
         : '<p class="c-sub" style="margin:0">No link saved for this homestay yet. Add it under Clients \u2192 Edit.</p>')
     + '</div>'
     + '<div class="card step">'
-    + '<div class="field" style="margin-bottom:0"><label for="p-msg">Your message</label>'
+    + '<div class="field" style="margin-bottom:0">'
+    + '<div class="msg-head"><label for="p-msg" style="margin:0">Your message</label>'
+    +   '<div class="presets">'
+    +     '<button class="chip" data-preset="connected" aria-pressed="'+(state.preset==="connected")+'">Connected</button>'
+    +     '<button class="chip" data-preset="notConnected" aria-pressed="'+(state.preset==="notConnected")+'">Not connected</button>'
+    +   '</div></div>'
     + '<textarea id="p-msg" placeholder="Write what you want to send"></textarea>'
     + '<div class="inserts">'
     +   '<button class="chip" data-ins="name">Insert name</button>'
     +   '<button class="chip" data-ins="homestay">Insert homestay</button>'
     +   (c.claudeLink ? '<button class="chip" data-ins="link">Insert link</button>' : '')
-    +   '<button class="chip" data-ins="reset">Reset to template</button>'
+    +   '<button class="chip" data-ins="reset">Reset message</button>'
     + '</div></div>'
     + '<div class="send-row">'
     +   '<button class="btn primary" id="sendWa">'+ICON.wa+'Send on WhatsApp</button>'
@@ -439,6 +457,29 @@ function wireDetails(c){
   var w = el("pitchDetails"), msg = el("p-msg");
   msg.value = state.msgTouched && state.draft != null ? state.draft : template(c);
   msg.addEventListener("input", function(){ state.msgTouched = true; state.draft = msg.value; });
+
+  var stSel = el("p-status");
+  if (stSel){
+    stSel.addEventListener("change", async function(){
+      var v = stSel.value;
+      stSel.className = "status-sel " + sclass(v) + " flash";
+      try{
+        await patchClient(c.id, {status:v});
+        toast(v === "Ready to pitch" ? "Still ready to pitch" : "Moved to \u201c"+v+"\u201d");
+      }catch(e){ toast("Couldn\u2019t update the status"); }
+    });
+  }
+
+  Array.prototype.forEach.call(w.querySelectorAll("[data-preset]"), function(b){
+    b.addEventListener("click", function(){
+      state.preset = b.dataset.preset;
+      state.msgTouched = false; state.draft = null;
+      msg.value = template(c);
+      Array.prototype.forEach.call(w.querySelectorAll("[data-preset]"), function(o){
+        o.setAttribute("aria-pressed", String(o.dataset.preset === state.preset));
+      });
+    });
+  });
 
   if (c.claudeLink){
     el("copyLink").addEventListener("click", function(){
@@ -466,10 +507,36 @@ function wireDetails(c){
   });
 }
 
+/* The two message presets. Edit the wording here.
+   The site link drops in on its own line so WhatsApp turns it into a tappable link. */
+var TEMPLATES = {
+  connected: function(c){
+    return "Hi, I\u2019m Naval from Madikeri. We just connected over call about your homestay. "
+      + "I build websites for businesses in coorg. I\u2019ve put together a sample website for "
+      + (c.homestay || "your homestay") + " so you can see how it looks. ignore the images for now"
+      + (c.claudeLink ? "\n\n" + c.claudeLink : "")
+      + "\n\ncall me back if interested"
+      + "\n\nDisclaimer:"
+      + "\n\n1. We don\u2019t charge an advance"
+      + "\n2. Images can be changed"
+      + "\n3. Design can be customised according to your liking";
+  },
+  notConnected: function(c){
+    return "Hi, I\u2019m Naval from Madikeri. I tried calling you but seems like you were busy. "
+      + "I build websites for businesses in coorg. I\u2019ve put together a sample website for "
+      + (c.homestay || "your homestay") + " so you can see how it looks. ignore the images for now"
+      + (c.claudeLink ? "\n\n" + c.claudeLink : "")
+      + "\n\ncall me back if interested"
+      + "\n\nDisclaimer:"
+      + "\n\n1. We don\u2019t charge an advance"
+      + "\n2. Images are just a sample and will be replaced with yours"
+      + "\n3. Design can be customised according to your liking";
+  }
+};
+
 function template(c){
-  return "Hi " + (c.name||"") + ", I build websites for homestays in Coorg. "
-    + "I\u2019ve put together a sample site for " + (c.homestay||"your homestay") + " so you can see how it would look"
-    + (c.claudeLink ? ": " + c.claudeLink : "") + ". Happy to walk you through it if you like it.";
+  var make = TEMPLATES[state.preset] || TEMPLATES.connected;
+  return make(c);
 }
 
 function insertAtCursor(ta, text){
