@@ -7,6 +7,7 @@ const os = require("os");
 
 const root = __dirname;
 const port = Number(process.env.PORT || 4173);
+const allowedFiles = new Set(["index.html", "app.js", "styles.css"]);
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -35,6 +36,12 @@ const server = http.createServer((req, res) => {
   }
 
   if (pathname === "/") pathname = "/index.html";
+  const requestedName = path.basename(pathname);
+  if (pathname !== "/index.html" && !allowedFiles.has(requestedName)) {
+    res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("Not found");
+    return;
+  }
   const filePath = path.resolve(root, "." + pathname);
   if (filePath !== root && !filePath.startsWith(root + path.sep)) {
     res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
