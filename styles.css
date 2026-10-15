@@ -34,6 +34,19 @@ body{
   font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
   transition:background-color .3s var(--ease), color .3s var(--ease);
 }
+.auth-gate{
+  position:fixed; inset:0; z-index:1000; display:grid; place-items:center;
+  padding:24px; background:rgba(10,13,10,.94); backdrop-filter:blur(12px);
+}
+.auth-gate[hidden]{display:none}
+.auth-card{
+  width:min(100%,440px); padding:32px; border:1px solid var(--line); border-radius:var(--radius);
+  background:var(--paper); box-shadow:var(--shadow); text-align:center;
+}
+.auth-card .wordmark{display:inline-flex; margin-bottom:20px}
+.auth-card h1{margin:0 0 8px; font-size:clamp(1.6rem,5vw,2rem)}
+.auth-card .sub{margin:0 0 24px}
+.auth-error{min-height:1.5em; margin:14px 0 0; color:var(--crimson); font-size:.9rem}
 body::before{content:""; position:fixed; inset:0 0 auto; height:env(safe-area-inset-top,0px); background:var(--bar); z-index:60;}
 
 /* ===================== TOP BAR ===================== */

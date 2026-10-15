@@ -11,6 +11,16 @@
 </head>
 <body>
 
+<section class="auth-gate" id="authGate" aria-labelledby="authTitle" hidden>
+  <div class="auth-card">
+    <span class="wordmark"><b>Vision 2027</b><span>Freedom</span></span>
+    <h1 id="authTitle">Sign in to continue</h1>
+    <p class="sub">Sign in with your Google account to open your client records.</p>
+    <button class="btn primary" id="googleSignIn">Continue with Google</button>
+    <p class="auth-error" id="authError" role="status" aria-live="polite"></p>
+  </div>
+</section>
+
 <header class="topbar">
   <div class="brand">
     <span class="wordmark"><b>Vision 2027</b><span>Freedom</span></span>
@@ -22,6 +32,7 @@
   </nav>
   <div class="bar-right">
     <span class="bar-note" id="storeNote"></span>
+    <button class="linkish" id="signOutBtn" type="button" hidden>Sign out</button>
   </div>
 </header>
 
@@ -106,6 +117,6 @@
 
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script src="app.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>

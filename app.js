@@ -1,5 +1,23 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+
 (function(){
 "use strict";
+
+var firebaseConfig = {
+  apiKey: "AIzaSyDcebyA2CoyHynRbFgmfrTvPa2yHYsmtWQ",
+  authDomain: "freedom2027.firebaseapp.com",
+  projectId: "freedom2027",
+  storageBucket: "freedom2027.firebasestorage.app",
+  messagingSenderId: "539779456768",
+  appId: "1:539779456768:web:f5e98b2555ca6ee6e7dde5",
+  measurementId: "G-YS3XHP8ENT"
+};
+var firebaseApp = initializeApp(firebaseConfig);
+var auth = getAuth(firebaseApp);
+var db = getFirestore(firebaseApp);
+var googleProvider = new GoogleAuthProvider();
 
 var STATUSES = ["Open","Ready to pitch","Converted","Done"];
 var SCLASS = {"Open":"s-open","Ready to pitch":"s-ready","Converted":"s-conv","Done":"s-done"};
@@ -14,9 +32,7 @@ var ICON = {
 
 var state = { page:"add", clients:[], filter:"All", search:"", editingId:null, pitchId:null, msgTouched:false, draft:null, confirmId:null, fresh:true };
 /* =========================================================================
-   DATA LAYER — the only part of this file that touches storage.
-   Everything below this block talks to `Store` and nothing else, so
-   swapping in a real database means editing this block alone.
+   DATA LAYER — Firestore stores the client records in the cloud.
 
    A client record looks like this. Keep these exact field names:
      {
@@ -30,88 +46,23 @@ var state = { page:"add", clients:[], filter:"All", search:"", editingId:null, p
        createdAt:  1760000000000          // epoch milliseconds, used for sorting
      }
 
-   To connect a database:
-     1. Set CONFIG.mode to "api" and CONFIG.apiBase to your server's base URL.
-     2. Implement these four endpoints. Return JSON; ids are strings.
-          GET    {apiBase}/clients          -> [record, record, ...]
-          POST   {apiBase}/clients          -> the created record (with its id)
-          PATCH  {apiBase}/clients/:id      -> the updated record (or any 2xx)
-          DELETE {apiBase}/clients/:id      -> any 2xx
-     3. Nothing else in this file needs to change.
-
-   A matching table:
-     CREATE TABLE clients (
-       id          TEXT PRIMARY KEY,
-       name        TEXT NOT NULL,
-       homestay    TEXT NOT NULL,
-       number      TEXT NOT NULL,
-       website     TEXT DEFAULT '',
-       claude_link TEXT DEFAULT '',
-       status      TEXT NOT NULL DEFAULT 'Open',
-       created_at  BIGINT NOT NULL
-     );
-   If your server returns snake_case, map it to camelCase inside ApiStore.list
-   rather than renaming fields in the rest of the file.
    ========================================================================= */
 
-var CONFIG = {
-  mode: "local",        // "local" = browser storage (works with no server)
-                        // "api"   = the REST endpoints described above
-  apiBase: "/api"
-};
-
 var FIELDS = ["name","homestay","number","website","claudeLink","status","createdAt"];
-
-/* ---- Browser storage: the default, so the file runs on its own ---- */
-
-var LocalStore = {
-  key: "vision2027.clients.v1",
-  read: function(){
-    try { return JSON.parse(localStorage.getItem(this.key) || "[]"); }
-    catch(e){ return []; }
+var clientsCollection = collection(db, "clients");
+var Store = {
+  list: async function(){
+    var snap = await getDocs(clientsCollection);
+    return snap.docs.map(function(item){ return Object.assign({id:item.id}, item.data()); });
   },
-  write: function(rows){
-    try { localStorage.setItem(this.key, JSON.stringify(rows)); } catch(e){}
-  },
-  list: async function(){ return this.read(); },
   create: async function(rec){
-    var rows = this.read();
-    rec.id = "c" + Date.now() + Math.random().toString(36).slice(2,7);
-    rows.unshift(rec); this.write(rows);
-    return rec;
+    var payload = Object.assign({}, rec); delete payload.id;
+    var created = await addDoc(clientsCollection, payload);
+    return Object.assign({id:created.id}, payload);
   },
-  update: async function(id, patch){
-    var rows = this.read();
-    for (var i=0;i<rows.length;i++){
-      if (rows[i].id === id){ Object.keys(patch).forEach(function(k){ rows[i][k] = patch[k]; }); break; }
-    }
-    this.write(rows);
-  },
-  remove: async function(id){
-    this.write(this.read().filter(function(r){ return r.id !== id; }));
-  }
+  update: async function(id, patch){ return await updateDoc(doc(db, "clients", id), patch); },
+  remove: async function(id){ return await deleteDoc(doc(db, "clients", id)); }
 };
-
-/* ---- REST storage: used when CONFIG.mode === "api" ---- */
-
-async function request(method, path, body){
-  var opts = { method: method, headers: {"Accept":"application/json"} };
-  if (body){ opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
-  var res = await fetch(CONFIG.apiBase + path, opts);
-  if (!res.ok) throw new Error(method + " " + path + " failed: " + res.status);
-  if (res.status === 204) return null;
-  var text = await res.text();
-  return text ? JSON.parse(text) : null;
-}
-
-var ApiStore = {
-  list:   async function(){ return (await request("GET", "/clients")) || []; },
-  create: async function(rec){ return await request("POST", "/clients", rec); },
-  update: async function(id, patch){ return await request("PATCH", "/clients/" + encodeURIComponent(id), patch); },
-  remove: async function(id){ return await request("DELETE", "/clients/" + encodeURIComponent(id)); }
-};
-
-var Store = CONFIG.mode === "api" ? ApiStore : LocalStore;
 
 /* ---- What the rest of the app calls ---- */
 
@@ -122,11 +73,11 @@ async function refresh(){
     var rows = await Store.list();
     state.clients = Array.isArray(rows) ? rows : [];
     sortClients();
-    setNote(CONFIG.mode === "api" ? "" : "Saved in this browser");
+    setNote("Saved to Firebase");
     renderAll();
   }catch(e){
     setNote("Can\u2019t reach the database");
-    toast("Couldn\u2019t load clients \u2014 check the server");
+    toast("Couldn\u2019t load clients \u2014 check Firebase access");
   }
 }
 
@@ -544,7 +495,28 @@ function renderAll(){
   if (state.page === "pitch") renderPitch();
 }
 
+var authGate = el("authGate");
+var authError = el("authError");
+el("googleSignIn").addEventListener("click", async function(){
+  authError.textContent = "";
+  try { await signInWithPopup(auth, googleProvider); }
+  catch(e){ authError.textContent = e && e.message ? e.message : "Google sign-in failed. Please try again."; }
+});
+el("signOutBtn").addEventListener("click", async function(){
+  try { await signOut(auth); }
+  catch(e){ toast("Couldn\u2019t sign out. Please try again."); }
+});
+
 renderAll();
-refresh();
+onAuthStateChanged(auth, function(user){
+  authGate.hidden = !!user;
+  el("signOutBtn").hidden = !user;
+  if (user) refresh();
+  else {
+    state.clients = [];
+    setNote("");
+    renderAll();
+  }
+});
 
 })();
