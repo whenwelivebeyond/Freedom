@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vision 2027 — Freedom</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="wordmark"><b>Vision 2027</b><span>Freedom</span></span>
+  </div>
+  <nav role="tablist" aria-label="Sections">
+    <button class="tab" role="tab" id="tab-add" aria-selected="true" data-page="add">Add client</button>
+    <button class="tab" role="tab" id="tab-list" aria-selected="false" data-page="list">Clients</button>
+    <button class="tab" role="tab" id="tab-pitch" aria-selected="false" data-page="pitch">Pitch</button>
+  </nav>
+  <div class="bar-right">
+    <span class="bar-note" id="storeNote"></span>
+  </div>
+</header>
+
+<main>
+
+  <section class="page is-on" id="page-add" role="tabpanel" aria-labelledby="tab-add">
+    <h1>Add a client</h1>
+    <p class="sub">One homestay owner per entry. Everything saved here shows up under Clients, where you set the status.</p>
+
+    <div class="card form-card">
+      <div class="two">
+        <div class="field" id="f-name">
+          <label for="i-name">Client name</label>
+          <input type="text" id="i-name" autocomplete="off" placeholder="Owner's name">
+          <div class="err">Add the client's name.</div>
+        </div>
+        <div class="field" id="f-stay">
+          <label for="i-stay">Homestay name</label>
+          <input type="text" id="i-stay" autocomplete="off" placeholder="Property name">
+          <div class="err">Add the homestay name.</div>
+        </div>
+      </div>
+
+      <div class="field" id="f-num">
+        <label for="i-num">WhatsApp number <span class="hint">— 10 digits is fine, +91 gets added</span></label>
+        <input type="tel" id="i-num" autocomplete="off" placeholder="98XXXXXXXX">
+        <div class="err">Add a number you can message.</div>
+      </div>
+
+      <div class="field">
+        <label for="i-site">Their current website <span class="hint">— leave blank if they have none</span></label>
+        <input type="url" id="i-site" autocomplete="off" placeholder="https://">
+      </div>
+
+      <div class="field">
+        <label for="i-claude">Site you built <span class="hint">— the link you'll send them</span></label>
+        <input type="url" id="i-claude" autocomplete="off" placeholder="https://claude.ai/...">
+      </div>
+
+      <div class="form-actions">
+        <button class="btn primary" id="saveBtn">Save client</button>
+        <button class="linkish" id="clearBtn">Clear form</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" id="page-list" role="tabpanel" aria-labelledby="tab-list">
+    <h1>Clients</h1>
+    <p class="sub">Change a status straight from the row. Mark someone “Ready to pitch” to make them selectable on the Pitch page.</p>
+    <div class="toolbar">
+      <input type="text" id="search" placeholder="Search name, homestay or number" aria-label="Search clients">
+      <div class="chips" id="filterChips"></div>
+    </div>
+    <div id="listWrap"></div>
+  </section>
+
+  <section class="page" id="page-pitch" role="tabpanel" aria-labelledby="tab-pitch">
+    <h1>Pitch</h1>
+    <p class="sub">Pick who you're messaging, grab the link, write the message, send it on WhatsApp.</p>
+    <div id="pitchWrap"></div>
+  </section>
+
+</main>
+
+<div class="overlay" id="editOverlay" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+  <div class="modal">
+    <h3 id="editTitle">Edit client</h3>
+    <div class="two">
+      <div class="field"><label for="e-name">Client name</label><input type="text" id="e-name"></div>
+      <div class="field"><label for="e-stay">Homestay name</label><input type="text" id="e-stay"></div>
+    </div>
+    <div class="field"><label for="e-num">WhatsApp number</label><input type="tel" id="e-num"></div>
+    <div class="field"><label for="e-site">Their current website</label><input type="url" id="e-site"></div>
+    <div class="field"><label for="e-claude">Site you built</label><input type="url" id="e-claude"></div>
+    <div class="field"><label for="e-status">Status</label><select id="e-status"></select></div>
+    <div class="form-actions">
+      <button class="linkish" id="editCancel">Cancel</button>
+      <button class="btn primary" id="editSave">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
